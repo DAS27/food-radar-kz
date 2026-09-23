@@ -1,28 +1,34 @@
 # Food Radar KZ
 
-Small Python monitor for public Instagram and Threads posts about restaurant events, promotions, food news, HoReCa and FoodTech in Almaty, Astana and Kazakhstan. It fetches results through Apify, filters them with transparent rules, stores new posts in SQLite and exports JSON or CSV. Python 3.10+; no runtime packages.
+Небольшой парсер публичных публикаций Instagram и Threads о событиях, акциях, ресторанных новостях, HoReCa и FoodTech в Алматы, Астане и Казахстане. Он получает публикации через Apify, отбирает подходящие по понятным правилам, сохраняет новые записи в SQLite и выгружает результат в JSON или CSV. Нужен Python 3.10 или новее; дополнительные библиотеки для работы не требуются.
 
-## Quick start
+## Быстрый запуск
 
 ```bash
 cp config.example.json config.json
 python3 -m food_radar collect --dry-run
-export APIFY_TOKEN='your Apify API token'
+export APIFY_TOKEN='<ваш токен Apify>'
 python3 -m food_radar collect --max-runs 8 --max-charge-usd 0.10
 python3 -m food_radar export --out exports/posts.csv
 ```
 
-`--max-runs` limits Actor calls in one invocation; `--max-charge-usd` caps each Actor run. With the sample config and defaults, the maximum charge for one invocation is $0.80. Daily runs at that maximum would exceed the $5 monthly Free plan credit; reduce sources/frequency or caps to fit your budget. Apify may still charge for useful results that fail the local relevance filter. Actor prices and platform rules can change. Check the [Apify pricing page](https://apify.com/pricing) before scheduling frequent runs. The program does not store or print the token; never commit it.
+Команда с `--dry-run` показывает запланированные запросы и предельную стоимость, ничего не отправляя в Apify. Параметр `--max-runs` ограничивает число запусков сборщиков за один вызов, а `--max-charge-usd` — расходы на каждый запуск. С примером конфигурации и значениями по умолчанию максимальная стоимость одного вызова составляет $0,80. При ежедневном запуске с таким пределом месячного бесплатного лимита Apify в $5 не хватит: уменьшите число источников, частоту запуска или лимит расходов. Apify может списать средства и за публикации, которые затем отсеет локальный фильтр. Цены и правила сервиса могут измениться; перед настройкой регулярного сбора проверьте [тарифы Apify](https://apify.com/pricing). Токен не сохраняется и не выводится программой; не добавляйте его в Git.
 
-Edit `config.json` to add public Instagram usernames to `instagram_profiles`, city-specific hashtags to `instagram_hashtags`, and search strings to `threads_queries`. Each Instagram profile, hashtag and Threads query is one Actor run. The first `--max-runs` jobs are executed in that order, so increase the limit to cover the whole config. `source_cities` maps a known username or source to `almaty` or `astana` when a post omits the city. For example:
+В `config.json` укажите публичные аккаунты Instagram в `instagram_profiles`, хештеги в `instagram_hashtags` и поисковые фразы для Threads в `threads_queries`. Каждый аккаунт, хештег и запрос запускает отдельный сборщик Apify. Выполняются первые `--max-runs` источников в порядке файла. Если добавили больше источников, увеличьте этот параметр или измените их порядок.
+
+Когда публикация не называет город, можно указать его для проверенного аккаунта через `source_cities`:
 
 ```json
-"source_cities": {"example_cafe": "astana"}
+{
+  "source_cities": {
+    "example_cafe": "astana"
+  }
+}
 ```
 
-The sample config leaves account names empty because it should not silently follow unverified businesses. It includes two example hashtags and six search queries. Review and replace these with sources that produce useful results. A dry run shows what would run without sending requests.
+В пример конфигурации уже включены два хештега и шесть поисковых запросов. Список аккаунтов оставлен пустым: добавьте рестораны, организаторов и отраслевые медиа, которые хотите отслеживать. Проверьте и замените примерные запросы по результатам первых сборов.
 
-If you already have a JSON dataset exported from either Actor, import it without an API token:
+Если вы уже выгрузили результаты сборщика Apify в JSON, их можно обработать без токена:
 
 ```bash
 python3 -m food_radar ingest threads-export.json --platform threads --source 'Алматы ресторан'
@@ -30,18 +36,24 @@ python3 -m food_radar ingest instagram-export.json --platform instagram --source
 python3 -m food_radar export --city almaty --category event --out exports/almaty-events.json
 ```
 
-## How it decides
+## Как отбираются публикации
 
-A post needs a food/restaurant term and a city in the text, Instagram location, trusted `source_cities` mapping, or the configured Instagram hashtag. Kazakhstan-wide industry posts are assigned `kazakhstan`. Event, promotion, industry and general food news are distinguished by keyword rules. An explicit event date such as `28.09.2026` or `28 сентября` is extracted when present; events with an explicit past date are skipped using Almaty/Astana time. Missing dates remain empty. Posts older than 14 days are skipped by default; change `max_post_age_days` in the config. SQLite prevents duplicate platform IDs and URLs. UTM parameters are removed before saving.
+В тексте должно быть упоминание еды или ресторанной тематики. Город определяется по тексту, геометке Instagram, заданному `source_cities` или хештегу, по которому найдена публикация. Материалы об отрасли в масштабе Казахстана получают метку `kazakhstan`. По ключевым словам публикации разделяются на события (`event`), акции (`promotion`), отраслевые материалы (`industry`) и другие новости о еде (`food_news`).
 
-This is a lead discovery feed, so review an original post before publishing its date, price or terms. The parser currently reads text captions; event posters containing details only in an image need OCR. It does not find all relevant posts or infer the date of a promotion from phrases such as “until Sunday.” It does not combine separate posts about the same real-world event.
+Если указана конкретная дата события, например `28.09.2026` или `28 сентября`, парсер извлекает её. События с прошедшей датой исключаются с учётом времени Алматы и Астаны. Если дату определить нельзя, поле остаётся пустым. По умолчанию публикации старше 14 дней не сохраняются; срок задаётся параметром `max_post_age_days` в конфигурации. SQLite предотвращает повторное сохранение публикаций с тем же ID или ссылкой. Параметры отслеживания вроде UTM из ссылок удаляются.
 
-## Sources and limits
+Подборка помогает находить материалы для дальнейшей проверки. Перед публикацией события или акции откройте исходный пост и проверьте дату, цену и условия. Сейчас парсер читает текст публикации; для афиш, где сведения указаны только на картинке, потребуется распознавание текста. Парсер не гарантирует полного охвата, не вычисляет срок акции из фразы «до воскресенья» и не объединяет разные посты об одном событии.
 
-- Instagram: [Apify Instagram Scraper](https://apify.com/apify/instagram-scraper), using public profile or hashtag URLs.
-- Threads: [The Mine Works Threads Scraper](https://apify.com/themineworks/threads-scraper), using recent keyword search.
-- API transport: [Apify synchronous Actor endpoint](https://docs.apify.com/api/v2/actors-actor-runs). The sync endpoint has a five-minute run limit; a timeout may leave the remote run's status unknown. Review the Apify console before retrying such a run.
+## Источники и ограничения
 
-Actor input/output schemas may change. Both third-party Actors should be checked with one small live run after configuring a token. The code and tests can be exercised offline using `ingest` or test fixtures, but this repository has not been validated against a live Apify account.
+- Instagram: [Apify Instagram Scraper](https://apify.com/apify/instagram-scraper), поиск по публичным аккаунтам и хештегам.
+- Threads: [The Mine Works Threads Scraper](https://apify.com/themineworks/threads-scraper), поиск свежих публикаций по ключевым словам.
+- Обращение к API: [синхронный запуск сборщика Apify](https://docs.apify.com/api/v2/actors-actor-runs). Он ждёт завершения не дольше пяти минут. Если время ожидания истекло, состояние удалённого запуска может быть неизвестным; перед повторной попыткой проверьте его в Apify.
 
-Run tests with `python3 -m unittest discover -s tests -v`.
+Форматы входных и выходных данных сторонних сборщиков могут измениться. После добавления токена стоит проверить каждый сборщик одним небольшим живым запуском. Код и тесты можно проверять без сети через `ingest` и тестовые данные, но на реальном аккаунте Apify этот репозиторий пока не проверялся.
+
+Запуск тестов:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
