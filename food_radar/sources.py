@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import ssl
 from dataclasses import dataclass
 from typing import Any
 from urllib import error, parse, request
@@ -14,6 +16,22 @@ class Job:
     source: str
     actor: str
     payload: dict[str, Any]
+
+
+def _tls_context() -> ssl.SSLContext:
+    bundle = os.environ.get("SSL_CERT_FILE")
+    if not bundle:
+        try:
+            import certifi
+        except ImportError as exc:
+            raise ValueError(
+                "Missing certifi CA bundle. Run: python3 -m pip install -e ."
+            ) from exc
+        bundle = certifi.where()
+    try:
+        return ssl.create_default_context(cafile=bundle)
+    except (OSError, ssl.SSLError) as exc:
+        raise ValueError(f"Cannot load CA bundle {bundle}: {exc}") from exc
 
 
 def build_jobs(config: dict[str, Any]) -> list[Job]:
@@ -70,12 +88,16 @@ def run_job(job: Job, token: str, max_charge_usd: float = 0.10) -> list[dict[str
         "Accept": "application/json",
     }, method="POST")
     try:
-        with request.urlopen(req, timeout=310) as response:
+        with request.urlopen(req, timeout=310, context=_tls_context()) as response:
             data = json.load(response)
     except error.HTTPError as exc:
         detail = exc.read(500).decode("utf-8", errors="replace")
         raise RuntimeError(f"Apify returned HTTP {exc.code}: {detail}") from exc
     except (error.URLError, TimeoutError) as exc:
+        if isinstance(getattr(exc, "reason", None), ssl.SSLCertVerificationError):
+            raise ValueError(
+                "TLS certificate verification failed. Check SSL_CERT_FILE or your network's trusted CA bundle."
+            ) from exc
         raise RuntimeError(f"Apify request failed: {exc}") from exc
     if not isinstance(data, list):
         raise RuntimeError(f"Apify returned an unexpected response for {job.source}")

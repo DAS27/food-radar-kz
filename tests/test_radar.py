@@ -1,8 +1,10 @@
 import json
+import ssl
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib import error
 from unittest.mock import patch
 
 from food_radar.classifier import normalize
@@ -92,13 +94,34 @@ class StorageAndCLITests(unittest.TestCase):
         jobs = build_jobs({"instagram_profiles": ["@cafe"], "threads_queries": ["Алматы ресторан"]})
         self.assertEqual(len(jobs), 2)
         self.assertEqual(jobs[0].payload["resultsLimit"], 10)
-        with patch("food_radar.sources.request.urlopen") as urlopen:
+        with patch("food_radar.sources.request.urlopen") as urlopen, \
+             patch("food_radar.sources._tls_context", return_value=object()) as tls_context:
             urlopen.return_value.__enter__.return_value.read.return_value = b"[]"
             self.assertEqual(run_job(jobs[0], "secret", 0.10), [])
             req = urlopen.call_args.args[0]
             self.assertIn("maxTotalChargeUsd=0.1", req.full_url)
             self.assertEqual(req.get_header("Authorization"), "Bearer secret")
             self.assertNotIn("secret", req.full_url)
+            self.assertIs(urlopen.call_args.kwargs["context"], tls_context.return_value)
+
+    def test_tls_error_stops_remaining_jobs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = root / "config.json"
+            config.write_text('{"threads_queries": ["Алматы ресторан", "Астана ресторан"]}')
+            with patch.dict("os.environ", {"APIFY_TOKEN": "secret"}), \
+                 patch("food_radar.cli.run_job", side_effect=ValueError("TLS verification failed")) as job:
+                self.assertEqual(main(["collect", "--config", str(config),
+                                       "--db", str(root / "radar.db")]), 2)
+                self.assertEqual(job.call_count, 1)
+
+    def test_tls_verification_failure_is_actionable(self):
+        job = build_jobs({"threads_queries": ["Алматы ресторан"]})[0]
+        failure = error.URLError(ssl.SSLCertVerificationError("certificate verify failed"))
+        with patch("food_radar.sources._tls_context", return_value=object()), \
+             patch("food_radar.sources.request.urlopen", side_effect=failure):
+            with self.assertRaisesRegex(ValueError, "TLS certificate verification failed"):
+                run_job(job, "secret")
 
 
 if __name__ == "__main__":
