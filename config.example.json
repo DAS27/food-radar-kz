@@ -1,0 +1,16 @@
+{
+  "instagram_profiles": [],
+  "instagram_hashtags": ["алматыеда", "астанаеда"],
+  "threads_queries": [
+    "Алматы ресторан",
+    "Астана ресторан",
+    "Алматы гастроужин",
+    "Астана открытие кафе",
+    "horeca Казахстан",
+    "foodtech Казахстан"
+  ],
+  "instagram_results_per_source": 10,
+  "threads_results_per_query": 15,
+  "max_post_age_days": 14,
+  "source_cities": {}
+}

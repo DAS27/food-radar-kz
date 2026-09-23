@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "food-radar-kz"
+version = "0.1.0"
+description = "Almaty and Astana food, restaurant, HoReCa and FoodTech monitor"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+food-radar = "food_radar.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["food_radar*"]
