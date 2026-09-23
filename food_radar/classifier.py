@@ -6,6 +6,9 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("Asia/Almaty")
 
 CITY_PATTERNS = {
     "almaty": re.compile(r"(?<!\w)(?:алматы|алмат[еыин]|almaty|almatı)(?!\w)", re.I),
@@ -41,14 +44,15 @@ def _published(value: Any) -> datetime | None:
         return datetime.fromtimestamp(value, timezone.utc)
     if isinstance(value, str) and value:
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+            result = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return (result if result.tzinfo else result.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
         except ValueError:
             return None
     return None
 
 
 def _event_date(text: str, published: datetime | None) -> str | None:
-    anchor = published.date() if published else datetime.now(timezone.utc).date()
+    anchor = published.astimezone(LOCAL_TZ).date() if published else datetime.now(LOCAL_TZ).date()
     match = DATE_NUMERIC.search(text)
     if match:
         day, month, year = int(match[1]), int(match[2]), int(match[3]) if match[3] else anchor.year
@@ -117,7 +121,7 @@ def normalize(raw: dict[str, Any], platform: str, source: str,
     else:
         category = "food_news"
     event_date = _event_date(text, published) if category == "event" else None
-    if event_date and date.fromisoformat(event_date) < datetime.now(timezone.utc).date():
+    if event_date and date.fromisoformat(event_date) < datetime.now(LOCAL_TZ).date():
         return None
     parts = urlsplit(url)
     if parts.netloc.lower() not in {"www.instagram.com", "instagram.com", "www.threads.com",
