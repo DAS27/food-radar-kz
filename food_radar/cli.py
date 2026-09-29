@@ -41,7 +41,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     exp.add_argument("--db", type=Path, default=Path("radar.db"))
     exp.add_argument("--out", type=Path, required=True)
     exp.add_argument("--city", choices=["almaty", "astana", "kazakhstan"])
-    exp.add_argument("--category", choices=["event", "promotion", "industry", "food_news"])
+    exp.add_argument("--category", choices=["opening", "event", "promotion", "industry", "food_news"])
     exp.add_argument("--source", help="Export only one profile, hashtag or search query")
     return parser.parse_args(argv)
 

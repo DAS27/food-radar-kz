@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-FIELDS = ("platform", "post_id", "url", "author", "source", "cities", "category",
+FIELDS = ("platform", "post_id", "url", "author", "source", "cities", "category", "venue",
           "text", "published_at", "event_date")
+VENUE_HANDLE = re.compile(r"(?<!\\w)@([a-z0-9._]{2,30})", re.I)
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -23,12 +25,22 @@ def connect(path: Path) -> sqlite3.Connection:
         source TEXT NOT NULL,
         cities TEXT NOT NULL,
         category TEXT NOT NULL,
+        venue TEXT,
         text TEXT NOT NULL,
         published_at TEXT,
         event_date TEXT,
         collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (platform, post_id)
     )""")
+    db.commit()
+    columns = {row[1] for row in db.execute("PRAGMA table_info(posts)")}
+    if "venue" not in columns:
+        db.execute("ALTER TABLE posts ADD COLUMN venue TEXT")
+        db.commit()
+    for post_id, text in db.execute("SELECT post_id, text FROM posts WHERE venue IS NULL"):
+        match = VENUE_HANDLE.search(text)
+        if match:
+            db.execute("UPDATE posts SET venue = ? WHERE post_id = ?", (match.group(1).lower(), post_id))
     db.commit()
     return db
 
@@ -37,8 +49,8 @@ def save(db: sqlite3.Connection, item: dict[str, Any]) -> bool:
     row = [json.dumps(item[k], ensure_ascii=False) if k == "cities" else item[k] for k in FIELDS]
     before = db.total_changes
     db.execute("""INSERT OR IGNORE INTO posts
-        (platform, post_id, url, author, source, cities, category, text, published_at, event_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", row)
+        (platform, post_id, url, author, source, cities, category, venue, text, published_at, event_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", row)
     db.commit()
     return db.total_changes > before
 

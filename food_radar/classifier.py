@@ -24,6 +24,9 @@ FOOD = re.compile(
 EVENT = re.compile(r"дегустац|гастроужин|фестивал|мастер[ -]?класс|ивент|"
                    r"концерт|вечеринк|мероприят|бранч|открыти[ея]|"
                    r"фест|кездесу|іс[ -]?шара", re.I)
+OPENING = re.compile(r"открыти[ея]|открыл[аио]|открыва[ею]|"
+                     r"нов(?:ый|ое|ая)s+(?:ресторан|кафе|бар|кофейн|бистро|заведени|место)|"
+                     r"news+(?:restaurant|cafe|bar|opening)", re.I)
 PROMOTION = re.compile(r"скидк|акци[яию]|спецпредлож|промокод|бонус|"
                        r"подарок|2\s*\+\s*1|1\s*\+\s*1|happy hour|"
                        r"жеңілдік|тегін|розыгрыш", re.I)
@@ -37,6 +40,7 @@ MONTHS = {"января": 1, "февраля": 2, "марта": 3, "апреля
           "сәуір": 4, "мамыр": 5, "маусым": 6, "шілде": 7, "тамыз": 8,
           "қыркүйек": 9, "қазан": 10, "қараша": 11, "желтоқсан": 12}
 DATE_WORD = re.compile(r"(?<!\d)(\d{1,2})\s+(" + "|".join(MONTHS) + r")(?:\s+(\d{4}))?", re.I)
+VENUE_HANDLE = re.compile(r"(?<!\w)@([a-z0-9._]{2,30})", re.I)
 
 
 def _published(value: Any) -> datetime | None:
@@ -112,7 +116,9 @@ def normalize(raw: dict[str, Any], platform: str, source: str,
         cities = ["kazakhstan"]
     if not cities:
         return None
-    if EVENT.search(text):
+    if OPENING.search(text):
+        category = "opening"
+    elif EVENT.search(text):
         category = "event"
     elif PROMOTION.search(text):
         category = "promotion"
@@ -136,6 +142,7 @@ def normalize(raw: dict[str, Any], platform: str, source: str,
         "source": source,
         "cities": cities,
         "category": category,
+        "venue": (VENUE_HANDLE.search(text).group(1).lower() if VENUE_HANDLE.search(text) else None),
         "text": text.strip(),
         "published_at": published.isoformat() if published else None,
         "event_date": event_date,

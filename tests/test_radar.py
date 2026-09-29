@@ -28,6 +28,13 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(result["event_date"], event_date.isoformat())
         self.assertEqual(result["url"], "https://www.instagram.com/p/abc/")
 
+    def test_opening_extracts_venue_handle(self):
+        row = {"id": "opening", "shortCode": "new", "caption": "@new_cafe открылось новое кафе в Алматы",
+               "url": "https://www.instagram.com/p/new/", "timestamp": recent()}
+        result = normalize(row, "instagram", "guide")
+        self.assertEqual(result["category"], "opening")
+        self.assertEqual(result["venue"], "new_cafe")
+
     def test_threads_promotion_and_source_city(self):
         row = {"post_id": "77", "text": "Скидка 20% на меню кафе до воскресенья",
                "url": "https://www.threads.com/@cafe/post/abc", "username": "cafe", "posted_at": recent()}
