@@ -35,13 +35,22 @@ def _tls_context() -> ssl.SSLContext:
         raise ValueError(f"Cannot load CA bundle {bundle}: {exc}") from exc
 
 
+def _instagram_username(value: Any) -> str:
+    """Accept an Instagram handle with @ or a public profile URL."""
+    text = str(value).strip()
+    parsed = parse.urlsplit(text)
+    if parsed.netloc.lower() in {"instagram.com", "www.instagram.com"}:
+        text = parsed.path.strip("/").split("/", 1)[0]
+    return text.strip().lstrip("@").lower()
+
+
 def build_jobs(config: dict[str, Any]) -> list[Job]:
     jobs: list[Job] = []
     limit = int(config.get("instagram_results_per_source", 10))
     if not 1 <= limit <= 100:
         raise ValueError("instagram_results_per_source must be between 1 and 100")
     for profile in config.get("instagram_profiles", []):
-        username = str(profile).strip().lstrip("@").lower()
+        username = _instagram_username(profile)
         if username:
             jobs.append(Job("instagram", username, "apify~instagram-scraper", {
                 "directUrls": [f"https://www.instagram.com/{username}/"],
@@ -51,7 +60,7 @@ def build_jobs(config: dict[str, Any]) -> list[Job]:
                 "skipPinnedPosts": True,
             }))
     for profile in config.get("scrapfly_instagram_profiles", []):
-        username = str(profile).strip().lstrip("@").lower()
+        username = _instagram_username(profile)
         if username:
             jobs.append(Job("instagram", username, "scrapfly", {
                 "username": username,

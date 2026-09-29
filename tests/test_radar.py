@@ -105,7 +105,7 @@ class StorageAndCLITests(unittest.TestCase):
             self.assertIs(urlopen.call_args.kwargs["context"], tls_context.return_value)
 
     def test_scrapfly_profile_job_and_response_adapter(self):
-        jobs = build_jobs({"scrapfly_instagram_profiles": ["@cafe"], "instagram_results_per_source": 2})
+        jobs = build_jobs({"scrapfly_instagram_profiles": ["https://www.instagram.com/cafe/"], "instagram_results_per_source": 2})
         self.assertEqual(jobs[0].provider, "scrapfly")
         self.assertEqual(jobs[0].payload["username"], "cafe")
         rows = _scrapfly_rows({"data": {"xdt_api__v1__feed__user_timeline_graphql_connection": {
