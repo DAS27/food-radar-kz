@@ -182,7 +182,7 @@ def run_scrapfly_job(job: Job, max_cost_credits: int = 50) -> list[dict[str, Any
     url = f"https://www.instagram.com/graphql/query/?{query}"
     try:
         response = ScrapflyClient(key=token).scrape(ScrapeConfig(
-            url=url, unblocker=True, country="kz", cost_budget=max_cost_credits,
+            url=url, unblocker=True, cost_budget=max_cost_credits,
             headers={"content-type": "application/x-www-form-urlencoded"},
         ))
         data = json.loads(response.content)
