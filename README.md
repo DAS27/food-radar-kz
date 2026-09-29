@@ -1,6 +1,6 @@
 # Food Radar KZ
 
-Небольшой парсер публичных публикаций Instagram и Threads о событиях, акциях, ресторанных новостях, HoReCa и FoodTech в Алматы, Астане и Казахстане. Он получает публикации через Apify, отбирает подходящие по понятным правилам, сохраняет новые записи в SQLite и выгружает результат в JSON или CSV. Нужен Python 3.10 или новее.
+Небольшой парсер публичных публикаций Instagram и Threads о событиях, акциях, ресторанных новостях, HoReCa и FoodTech в Алматы, Астане и Казахстане. Он получает публикации через Apify и Scrapfly, отбирает подходящие по понятным правилам, сохраняет новые записи в SQLite и выгружает результат в JSON или CSV. Нужен Python 3.10 или новее.
 
 ## Быстрый запуск
 
@@ -11,6 +11,7 @@ python3 -m pip install -e .
 cp config.example.json config.json
 python3 -m food_radar collect --dry-run
 export APIFY_TOKEN='<ваш токен Apify>'
+export SCRAPFLY_API_KEY='<ваш ключ Scrapfly>'
 python3 -m food_radar collect --max-runs 8 --max-charge-usd 0.10
 python3 -m food_radar export --out exports/posts.csv
 ```
@@ -19,7 +20,16 @@ python3 -m food_radar export --out exports/posts.csv
 
 Если Python сообщает `CERTIFICATE_VERIFY_FAILED`, обновите проект командой `python3 -m pip install -e .` в активированном виртуальном окружении. Парсер использует корневые сертификаты из пакета `certifi` и продолжает проверять HTTPS-сертификат Apify. Если в вашей сети действует собственный удостоверяющий центр, укажите его PEM-файл через `SSL_CERT_FILE`. Не отключайте проверку сертификатов.
 
-В `config.json` укажите публичные аккаунты Instagram в `instagram_profiles`, хештеги в `instagram_hashtags` и поисковые фразы для Threads в `threads_queries`. Каждый аккаунт, хештег и запрос запускает отдельный сборщик Apify. Выполняются первые `--max-runs` источников в порядке файла. Если добавили больше источников, увеличьте этот параметр или измените их порядок.
+В `config.json` укажите публичные аккаунты Instagram в `instagram_profiles`, хештеги в `instagram_hashtags` и поисковые фразы для Threads в `threads_queries`. Эти источники выполняются через Apify. Для мониторинга известных ресторанов добавьте их в `scrapfly_instagram_profiles`: Scrapfly получает свежие посты публичных профилей без входа в Instagram. Он не заменяет поиск по хештегам. Выполняются первые `--max-runs` источников в порядке файла. Если добавили больше источников, увеличьте этот параметр или измените их порядок.
+
+```json
+{
+  "scrapfly_instagram_profiles": ["restaurant_almaty", "cafe_astana"],
+  "scrapfly_cost_budget": 50
+}
+```
+
+`SCRAPFLY_API_KEY` хранится только в переменной окружения. `scrapfly_cost_budget` задаёт максимум кредитов, который Scrapfly может использовать для одной попытки обхода защиты; допустимы значения от 1 до 100. В `--dry-run` показывается порядок источников и предельная сумма только для Apify, поскольку Scrapfly тарифицирует запросы кредитами.
 
 Когда публикация не называет город, можно указать его для проверенного аккаунта через `source_cities`:
 
@@ -53,6 +63,7 @@ python3 -m food_radar export --city almaty --category event --out exports/almaty
 
 - Instagram: [Apify Instagram Scraper](https://apify.com/apify/instagram-scraper), поиск по публичным аккаунтам и хештегам.
 - Threads: [The Mine Works Threads Scraper](https://apify.com/themineworks/threads-scraper), поиск свежих публикаций по ключевым словам.
+- Instagram-профили: [Scrapfly](https://scrapfly.io/), чтение последних публикаций публичных профилей. Для него нужен отдельный ключ API и расходуются кредиты.
 - Обращение к API: [синхронный запуск сборщика Apify](https://docs.apify.com/api/v2/actors-actor-runs). Он ждёт завершения не дольше пяти минут. Если время ожидания истекло, состояние удалённого запуска может быть неизвестным; перед повторной попыткой проверьте его в Apify.
 
 Форматы входных и выходных данных сторонних сборщиков могут измениться. После добавления токена стоит проверить каждый сборщик одним небольшим живым запуском. Код и тесты можно проверять без сети через `ingest` и тестовые данные, но на реальном аккаунте Apify этот репозиторий пока не проверялся.

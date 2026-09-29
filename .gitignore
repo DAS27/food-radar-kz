@@ -1,8 +1,13 @@
 __pycache__/
+.DS_Store
 *.py[cod]
 *.egg-info/
 .venv/
 .env
+.agents/
+.claude/
+agent/
+skills-lock.json
 *.db
 *.sqlite*
 exports/

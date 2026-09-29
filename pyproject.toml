@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Almaty and Astana food, restaurant, HoReCa and FoodTech monitor"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["certifi>=2024.2.2"]
+dependencies = ["certifi>=2024.2.2", "scrapfly-sdk>=0.8.21"]
 
 [project.scripts]
 food-radar = "food_radar.cli:main"

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from .classifier import normalize
-from .sources import build_jobs, run_job
+from .sources import build_jobs, run_job, run_scrapfly_job
 from .storage import connect, export, save
 
 
@@ -23,13 +23,13 @@ def _read_config(path: Path) -> dict:
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Restaurant, HoReCa and FoodTech radar for Kazakhstan")
     sub = parser.add_subparsers(dest="command", required=True)
-    collect = sub.add_parser("collect", help="Run configured Apify searches")
+    collect = sub.add_parser("collect", help="Run configured Apify and Scrapfly sources")
     collect.add_argument("--config", type=Path, default=Path("config.json"))
     collect.add_argument("--db", type=Path, default=Path("radar.db"))
     collect.add_argument("--max-charge-usd", type=float, default=0.10,
                          help="Apify spending cap per actor run (default: $0.10)")
     collect.add_argument("--max-runs", type=int, default=8,
-                         help="Maximum actor runs in this invocation (default: 8)")
+                         help="Maximum source runs in this invocation (default: 8)")
     collect.add_argument("--dry-run", action="store_true", help="Show planned jobs and maximum spend")
     ingest = sub.add_parser("ingest", help="Import a JSON export from an Apify Actor")
     ingest.add_argument("file", type=Path)
@@ -90,18 +90,22 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("No sources configured")
         if args.dry_run:
             for job in jobs:
-                print(f"{job.platform}: {job.source} ({job.actor})")
-            print(f"Maximum charge across these runs: ${len(jobs) * args.max_charge_usd:.2f}")
+                print(f"{job.platform}: {job.source} ({job.provider}: {job.actor})")
+            apify_jobs = sum(job.provider == "apify" for job in jobs)
+            print(f"Maximum Apify charge across these runs: ${apify_jobs * args.max_charge_usd:.2f}")
+            print("Scrapfly requests use the credit budget from config.json.")
             return 0
         token = os.environ.get("APIFY_TOKEN", "").strip()
-        if not token:
+        if any(job.provider == "apify" for job in jobs) and not token:
             raise ValueError("Set APIFY_TOKEN to collect live data; use --dry-run to preview")
+        scrapfly_budget = int(config.get("scrapfly_cost_budget", 50))
         with connect(args.db) as db:
             total_new = 0
             failures = 0
             for job in jobs:
                 try:
-                    rows = run_job(job, token, args.max_charge_usd)
+                    rows = (run_scrapfly_job(job, scrapfly_budget) if job.provider == "scrapfly"
+                            else run_job(job, token, args.max_charge_usd))
                     accepted, new = _ingest_rows(db, rows, job.platform, job.source,
                                                  source_cities, max_post_age_days)
                     total_new += new

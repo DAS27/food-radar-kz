@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from food_radar.classifier import normalize
 from food_radar.cli import main
-from food_radar.sources import build_jobs, run_job
+from food_radar.sources import _scrapfly_rows, build_jobs, run_job
 from food_radar.storage import connect, export, save
 
 
@@ -103,6 +103,16 @@ class StorageAndCLITests(unittest.TestCase):
             self.assertEqual(req.get_header("Authorization"), "Bearer secret")
             self.assertNotIn("secret", req.full_url)
             self.assertIs(urlopen.call_args.kwargs["context"], tls_context.return_value)
+
+    def test_scrapfly_profile_job_and_response_adapter(self):
+        jobs = build_jobs({"scrapfly_instagram_profiles": ["@cafe"], "instagram_results_per_source": 2})
+        self.assertEqual(jobs[0].provider, "scrapfly")
+        self.assertEqual(jobs[0].payload["username"], "cafe")
+        rows = _scrapfly_rows({"data": {"xdt_api__v1__feed__user_timeline_graphql_connection": {
+            "edges": [{"node": {"pk": "1", "code": "abc", "caption": {"text": "Акция в кафе Астана"},
+                                "taken_at": 1_700_000_000}}]}}}, "cafe")
+        self.assertEqual(rows[0]["url"], "https://www.instagram.com/p/abc/")
+        self.assertEqual(rows[0]["ownerUsername"], "cafe")
 
     def test_tls_error_stops_remaining_jobs(self):
         with tempfile.TemporaryDirectory() as temp:

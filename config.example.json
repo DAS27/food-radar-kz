@@ -1,5 +1,6 @@
 {
   "instagram_profiles": [],
+  "scrapfly_instagram_profiles": [],
   "instagram_hashtags": ["алматыеда", "астанаеда"],
   "threads_queries": [
     "Алматы ресторан",
@@ -11,6 +12,7 @@
   ],
   "instagram_results_per_source": 10,
   "threads_results_per_query": 15,
+  "scrapfly_cost_budget": 50,
   "max_post_age_days": 14,
   "source_cities": {}
 }
