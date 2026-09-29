@@ -69,7 +69,7 @@ class StorageAndCLITests(unittest.TestCase):
             with connect(db_path) as db:
                 self.assertTrue(save(db, item))
                 self.assertFalse(save(db, item))
-                self.assertEqual(export(db, out, "json", city="astana", category="event"), 1)
+                self.assertEqual(export(db, out, "json", city="astana", category="event", source="search"), 1)
             self.assertEqual(len(json.loads(out.read_text())), 1)
 
     def test_ingest_and_export_commands(self):

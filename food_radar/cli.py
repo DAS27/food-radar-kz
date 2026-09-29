@@ -42,6 +42,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     exp.add_argument("--out", type=Path, required=True)
     exp.add_argument("--city", choices=["almaty", "astana", "kazakhstan"])
     exp.add_argument("--category", choices=["event", "promotion", "industry", "food_news"])
+    exp.add_argument("--source", help="Export only one profile, hashtag or search query")
     return parser.parse_args(argv)
 
 
@@ -63,7 +64,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "export":
             with connect(args.db) as db:
-                count = export(db, args.out, args.out.suffix.lstrip(".").lower(), args.city, args.category)
+                count = export(db, args.out, args.out.suffix.lstrip(".").lower(),
+                               args.city, args.category, args.source)
             print(f"Exported {count} posts to {args.out}")
             return 0
         config = _read_config(args.config)

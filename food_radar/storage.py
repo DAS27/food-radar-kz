@@ -44,7 +44,7 @@ def save(db: sqlite3.Connection, item: dict[str, Any]) -> bool:
 
 
 def export(db: sqlite3.Connection, path: Path, fmt: str, city: str | None = None,
-           category: str | None = None) -> int:
+           category: str | None = None, source: str | None = None) -> int:
     if fmt not in {"json", "csv"}:
         raise ValueError("format must be json or csv")
     query = "SELECT " + ", ".join(FIELDS) + " FROM posts WHERE 1=1"
@@ -55,6 +55,9 @@ def export(db: sqlite3.Connection, path: Path, fmt: str, city: str | None = None
     if category:
         query += " AND category = ?"
         params.append(category)
+    if source:
+        query += " AND source = ?"
+        params.append(source)
     query += " ORDER BY published_at DESC, collected_at DESC"
     rows = [dict(zip(FIELDS, row)) for row in db.execute(query, params)]
     for row in rows:
